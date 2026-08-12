@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # The unit tests need import-time dependencies only — no network, no API
+      # keys, no Qdrant. Installing the full requirements.txt would drag in
+      # PyTorch via sentence-transformers and turn a 40-second job into a
+      # five-minute one for no added coverage.
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest logfire langgraph flashrank portkey-ai \
+                      langchain-openai langchain-google-genai qdrant-client
+
+      - name: Run tests
+        run: pytest -q
+
+      # Catches syntax errors in modules the unit tests do not import — the
+      # ingestion CLI and the Streamlit app, neither of which has test coverage.
+      - name: Byte-compile everything
+        run: python -m compileall -q app evals ui tests
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Building the image is the only thing that proves requirements-prod.txt is
+      # actually installable and complete. A missing production dependency is
+      # invisible locally, where the dev environment has everything.
+      - name: Build production image
+        run: docker build -t enterprise-rag:ci .

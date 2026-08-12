@@ -1,0 +1,61 @@
+# ==============================================================================
+# LOCAL DEMO REQUIREMENTS — the minimum to run the chat demo end to end.
+#
+# Excluded relative to requirements.txt:
+#   ragas, pandas, nest-asyncio   → eval dashboard only
+#   unstructured                  → .docx/.pptx now parse via python-docx and
+#                                   python-pptx; unstructured is only needed for
+#                                   other office formats
+#   pdfplumber                    → per-page PDF fallback; DATA/true_data has no PDFs
+#   langchain-google-genai        → Gemini embeddings, cloud mode only
+#   pytest                        → tests
+#
+# ------------------------------------------------------------------------------
+# IMPORTANT — install CPU-only PyTorch FIRST, or pip will pull the CUDA build
+# (~2.5 GB on Windows) as a dependency of sentence-transformers:
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cpu
+#     pip install -r requirements-demo.txt
+#
+# The CPU wheel is roughly 200 MB. Nothing here uses a GPU — the reranker runs
+# ONNX on CPU and embeddings are small enough that it makes no difference.
+# ==============================================================================
+
+# --- API & UI ---
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+streamlit
+numpy
+
+# --- Agent orchestration ---
+langchain
+langgraph
+langchain-groq            # guardrail LLM
+langchain-openai          # points at Groq directly in local mode
+langchain-community
+pydantic>=2.0.0
+openai                    # direct-mode client
+
+# --- Guardrails ---
+nemoguardrails
+langchain-google-vertexai      # NeMo resolves provider integrations at import
+langchain-nvidia-ai-endpoints  # time and has failed without these
+
+# --- Retrieval ---
+qdrant-client             # embedded mode in the demo — no account needed
+flashrank                 # local ONNX cross-encoder reranker
+sentence-transformers     # local embeddings — install CPU torch first, see above
+
+# --- Ingestion (DATA/true_data: pptx, docx, html, txt) ---
+python-docx
+python-pptx
+beautifulsoup4
+pypdf                     # only if you ingest the noisy corpus too
+
+# --- Gateway (unused in local mode, imported at module load) ---
+portkey-ai
+
+# --- Observability ---
+logfire[fastapi,requests]

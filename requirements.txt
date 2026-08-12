@@ -1,0 +1,67 @@
+# ==============================================================================
+# LOCAL DEVELOPMENT REQUIREMENTS
+#
+# Everything needed to run the API, the Streamlit UI, ingestion and the eval
+# suite on one machine. The serving container uses the smaller, pinned
+# requirements-prod.txt instead.
+#
+# These are intentionally unpinned for development convenience. Before you
+# deploy or hand this to anyone, freeze them:
+#     pip freeze > requirements.lock.txt
+# ==============================================================================
+
+# --- API & WEB ---
+fastapi                     # HTTP layer for /query
+uvicorn[standard]           # ASGI server
+python-dotenv               # loads .env
+requests                    # UI → backend calls, eval pipeline
+streamlit                   # chat UI and eval dashboard
+nest-asyncio                # lets the eval dashboard run async RAGAS inside Streamlit's loop
+numpy
+pandas                      # eval result tables
+
+# --- EMBEDDINGS ---
+langchain-google-genai      # Gemini embeddings (primary)
+sentence-transformers       # all-mpnet-base-v2 local fallback; also used internally by FlashRank
+
+# --- VECTOR DB & RERANKING ---
+qdrant-client
+flashrank                   # local ONNX cross-encoder reranker
+
+# --- AGENT ORCHESTRATION ---
+langchain
+langgraph                   # state machine: planner → retriever → responder
+langchain-groq              # guardrail LLM
+langchain-openai            # OpenAI-compatible client aimed at the Portkey gateway
+openai                      # imported directly by the direct-Groq path and the RAGAS judge;
+                            # was arriving transitively via langchain-openai, now declared
+langchain-community
+pydantic>=2.0.0
+
+# --- GUARDRAILS ---
+nemoguardrails              # Colang rails: off-topic, jailbreak, dialog
+langchain-google-vertexai   # see requirements-prod.txt — NeMo import-time dependency
+langchain-nvidia-ai-endpoints
+
+# --- LLM GATEWAY ---
+portkey-ai                  # routing, 70B→8B fallback, response cache, retries
+
+# --- DOCUMENT PARSING ---
+pypdf                       # primary PDF text extraction
+pdfplumber                  # per-page fallback for pages pypdf returns blank
+beautifulsoup4              # HTML
+python-docx                 # DOCX (used directly by evals/data_parser.py)
+python-pptx                 # PPTX
+unstructured                # generic DOCX/PPTX partitioning in the ingestion loader
+
+# --- OBSERVABILITY ---
+logfire[fastapi,requests]   # manual spans across every node
+langsmith                   # automatic LangChain/LangGraph tracing
+
+# --- EVALUATION ---
+ragas                       # faithfulness, relevancy, context precision/recall, correctness
+
+# --- TESTING ---
+pytest
+pytest-asyncio
+httpx                       # FastAPI TestClient transport
