@@ -1,0 +1,46 @@
+# ==============================================================================
+# TEST REQUIREMENTS — what `pytest` needs and nothing more.
+#
+# This file exists because CI previously hard-coded its package list inline in
+# the workflow. The list drifted from what the tests actually import and CI
+# failed on a missing python-dotenv — a failure that said nothing about the code
+# under test. A file that lives next to the tests is easier to keep honest.
+#
+# Deliberately excluded, to keep CI at well under a minute:
+#   torch, sentence-transformers  → the tests stub embeddings; nothing needs a
+#                                   real model, and torch alone is minutes of CI
+#   streamlit, ragas, pandas      → UI and eval-dashboard only, no test coverage
+#   unstructured, pdfplumber      → ingestion loaders exercised through smaller
+#                                   parsers; no test imports them
+# ==============================================================================
+
+pytest
+
+# Configuration — app/config.py loads .env at import, so every test needs this.
+python-dotenv
+
+# Observability — imported unconditionally throughout app/.
+logfire[fastapi]
+
+# API surface — the smoke test imports app.main to catch startup failures.
+fastapi
+httpx                     # FastAPI TestClient transport
+
+# Agent graph
+langgraph
+langchain
+langchain-openai
+langchain-community
+pydantic
+
+# Gateway
+portkey-ai
+openai
+
+# Retrieval
+qdrant-client
+flashrank
+langchain-google-genai    # imported at module load by embedding.py
+
+# Eval-suite helpers under test (detect_tool, the confusion matrix)
+requests

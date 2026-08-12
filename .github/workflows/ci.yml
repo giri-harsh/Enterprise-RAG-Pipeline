@@ -13,28 +13,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 3.12 matches local development. 3.14 is excluded on purpose: several
+      # dependencies have no cp314 wheels, so pip falls back to compiling from
+      # source and fails on pyarrow without CMake.
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-test.txt
 
-      # The unit tests need import-time dependencies only — no network, no API
-      # keys, no Qdrant. Installing the full requirements.txt would drag in
-      # PyTorch via sentence-transformers and turn a 40-second job into a
-      # five-minute one for no added coverage.
+      # Installed from a file rather than an inline list. The inline version
+      # drifted from what the tests import and CI failed on a missing
+      # python-dotenv — an error that pointed nowhere near the real problem.
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest logfire langgraph flashrank portkey-ai \
-                      langchain-openai langchain-google-genai qdrant-client
+          python -m pip install -r requirements-test.txt
 
       - name: Run tests
+        env:
+          # The app must start with no credentials at all. This is not just CI
+          # hygiene — a blank LOGFIRE_TOKEN used to crash the API at startup and
+          # the ingestion CLI before it indexed anything, because three entry
+          # points called logfire.configure() in a way that raised without one.
+          LOGFIRE_TOKEN: ""
+          LANGSMITH_TRACING: "false"
         run: pytest -q
 
-      # Catches syntax errors in modules the unit tests do not import — the
-      # ingestion CLI and the Streamlit app, neither of which has test coverage.
+      # Catches syntax errors in modules no test imports — the ingestion CLI and
+      # the Streamlit app, neither of which has coverage.
       - name: Byte-compile everything
-        run: python -m compileall -q app evals ui tests
+        run: python -m compileall -q app evals ui tests scripts
 
   docker:
     runs-on: ubuntu-latest
@@ -42,7 +51,34 @@ jobs:
       - uses: actions/checkout@v4
 
       # Building the image is the only thing that proves requirements-prod.txt is
-      # actually installable and complete. A missing production dependency is
-      # invisible locally, where the dev environment has everything.
+      # complete and installable. A missing production dependency is invisible
+      # locally, where the dev environment already has everything.
       - name: Build production image
         run: docker build -t enterprise-rag:ci .
+
+      # The image starting is a stronger signal than it building. This is the
+      # check that would have caught the blank-token startup crash.
+      - name: Container starts and serves /health
+        run: |
+          docker run -d --name rag-ci -p 8080:8080 \
+            -e LOCAL_MODE=true \
+            -e GROQ_API_KEY=ci-placeholder \
+            enterprise-rag:ci
+
+          # Generous window: startup compiles the Colang flows, which embeds every
+          # example utterance in the rail definitions and pulls a model on first
+          # run. Well over a minute on a cold runner.
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "Health endpoint responded after ~$((i * 3))s."
+              curl -s http://localhost:8080/health
+              docker rm -f rag-ci
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "Container never became healthy. Logs:"
+          docker logs rag-ci
+          docker rm -f rag-ci
+          exit 1
