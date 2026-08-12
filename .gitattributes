@@ -1,0 +1,42 @@
+# Normalise line endings so the repo is identical regardless of who clones it.
+#
+# Without this, a Windows checkout writes CRLF, a Linux one writes LF, and a
+# cross-platform contributor sees every line of a file as changed when nothing
+# was touched. Git stores LF; each checkout gets whatever its platform expects.
+* text=auto
+
+# Always LF, whatever the platform. These are read by tools that break on CRLF:
+# shell scripts silently fail with `\r` in the shebang, and Docker copies the
+# file verbatim into a Linux image.
+*.sh            text eol=lf
+*.py            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.toml          text eol=lf
+*.md            text eol=lf
+*.txt           text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+.gcloudignore   text eol=lf
+.gitignore      text eol=lf
+.env.example    text eol=lf
+
+# Always CRLF — PowerShell on older Windows hosts can choke on LF-only scripts.
+*.ps1           text eol=crlf
+*.bat           text eol=crlf
+
+# Binary. Marking these stops Git attempting line-ending conversion, which
+# corrupts them, and stops it printing useless diffs.
+*.pdf           binary
+*.pptx          binary
+*.docx          binary
+*.xlsx          binary
+*.png           binary
+*.jpg           binary
+*.onnx          binary
+*.faiss         binary
+*.pkl           binary
+
+# Notebooks diff terribly and are mostly generated output. Treat as text so they
+# are searchable, but do not try to merge them.
+*.ipynb         text eol=lf -merge
