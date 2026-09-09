@@ -28,15 +28,14 @@ langchain==1.2.18
 langgraph==1.1.10
 langchain-groq==1.1.2     # guardrail LLM (llama-3.1-8b-instant)
 langchain-openai==1.2.1   # OpenAI-compatible client pointed at the Portkey gateway
-openai                    # imported directly by app/gateway/client.py in direct mode.
-                          # Pin with: pip freeze | grep "^openai=="
+openai==2.54.0            # imported directly by app/gateway/client.py in direct mode. Pinned 2026-09-09.
 langchain-community==0.4.1
 pydantic==2.13.4
 
 # Embeddings. Imported at module load by app/services/retrieval/embedding.py —
 # the container cannot start without it.
-# Pin before deploying:  pip freeze | grep langchain-google-genai
-langchain-google-genai
+# Pinned 2026-09-09 (pip freeze in the working venv).
+langchain-google-genai==4.4.0
 
 # --- GUARDRAILS ---
 nemoguardrails==0.21.0
