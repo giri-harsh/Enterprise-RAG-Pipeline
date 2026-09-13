@@ -25,7 +25,7 @@
 FROM python:3.11-slim-bookworm
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-        gcc g++ libgomp1 \
+        gcc g++ gfortran libgomp1 libopenblas-dev liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -60,6 +60,36 @@ WORKDIR /app
 # comment in that file). No extra packages needed, unlike the fastembed variant.
 COPY requirements-prod.txt .
 RUN pip install --no-cache-dir --prefer-binary -r requirements-prod.txt
+
+# Neither numpy version pinned so far (2.4.4, then 1.26.4) fixed the SIGILL —
+# same exact fault line on both, which means it isn't a numpy-version issue,
+# it's the prebuilt PyPI wheel's compiled SIMD baseline not matching what
+# Render's virtualized CPU actually executes correctly. Rebuilding from
+# source targets the real build-time CPU instead of a generic wheel baseline.
+# --force-reinstall so this genuinely replaces the wheel just installed above.
+RUN pip install --no-cache-dir --no-binary numpy --force-reinstall "numpy==1.26.4"
+
+# Belt-and-suspenders: also route NeMo Guardrails' embeddings-index build/
+# search (nemoguardrails/embeddings/basic.py) around the two calls that
+# actually crashed (confirmed via faulthandler — np.linalg.norm, called from
+# build() and search()) onto plain elementwise arithmetic instead of numpy's
+# specialized linalg dispatch. Fails the build loudly if the source text
+# doesn't match, rather than silently no-op'ing on a nemoguardrails version
+# bump.
+RUN python -c "\
+import nemoguardrails.embeddings.basic as m, inspect; \
+path = inspect.getfile(m); \
+src = open(path).read(); \
+old1 = 'matrix = np.asarray(self._embeddings, dtype=np.float32)\n        norms = np.linalg.norm(matrix, axis=1, keepdims=True)'; \
+new1 = 'matrix = np.asarray(self._embeddings, dtype=np.float64)\n        norms = np.sqrt(np.sum(matrix * matrix, axis=1, keepdims=True))'; \
+old2 = 'query = np.asarray(_embedding, dtype=np.float32)\n        query_norm = np.linalg.norm(query)'; \
+new2 = 'query = np.asarray(_embedding, dtype=np.float64)\n        query_norm = float(np.sqrt(np.sum(query * query)))'; \
+old3 = 'cosine = self._index @ query'; \
+new3 = 'cosine = np.sum(self._index * query, axis=1)'; \
+assert old1 in src and old2 in src and old3 in src, 'nemoguardrails basic.py source changed — patch no longer applies'; \
+src = src.replace(old1, new1).replace(old2, new2).replace(old3, new3); \
+open(path, 'w').write(src); \
+print('patched', path)"
 
 # Pre-fetch the FlashRank ONNX reranker model into the image.
 RUN python -c "from flashrank import Ranker; Ranker(cache_dir='/tmp/flashrank')"
