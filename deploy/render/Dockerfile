@@ -39,7 +39,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Guardrails' embedding-similarity search (a numpy op), not anywhere
     # memory-related. Forcing a conservative baseline target avoids the
     # mis-dispatch. See DEPLOYMENT_REPORT.md.
-    OPENBLAS_CORETYPE=Haswell
+    OPENBLAS_CORETYPE=Haswell \
+    # Diagnostic: OPENBLAS_CORETYPE alone didn't stop the crash — same fault
+    # point, same exit code. faulthandler catches SIGILL too (on platforms
+    # that support it) and prints the actual Python-level stack frame that
+    # was executing, turning a blind native-code guess into a real traceback
+    # in the container logs. Temporary — remove once the real cause is found.
+    PYTHONFAULTHANDLER=1
 
 WORKDIR /app
 
