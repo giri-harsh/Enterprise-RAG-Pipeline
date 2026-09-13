@@ -20,7 +20,11 @@ requests==2.33.1          # also required by logfire[requests] instrumentation
 numpy==2.4.4              # transitive hard requirement of qdrant-client and FlashRank
 
 # --- VECTOR DB & RETRIEVAL ---
-qdrant-client==1.17.1
+qdrant-client==1.19.0     # must match the client that wrote .qdrant_local's meta.json —
+                          # 1.17.1 (the prior pin) fails to parse 1.19's on-disk schema
+                          # for the embedded/local backend (extra_forbidden / model_type
+                          # errors on VectorParams). Bumped 2026-09-13 to match the venv
+                          # that ingested the baked-in collection.
 FlashRank==0.2.10
 
 # --- LANGCHAIN & AGENTIC ORCHESTRATION ---
