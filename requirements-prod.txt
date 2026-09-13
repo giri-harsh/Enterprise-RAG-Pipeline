@@ -17,7 +17,15 @@ fastapi==0.136.1
 uvicorn[standard]==0.46.0
 python-dotenv==1.2.2
 requests==2.33.1          # also required by logfire[requests] instrumentation
-numpy==2.4.4              # transitive hard requirement of qdrant-client and FlashRank
+numpy==1.26.4             # transitive hard requirement of qdrant-client and FlashRank.
+                          # Downgraded from 2.4.4 2026-09-13: that build's compiled
+                          # linalg dispatch (numpy.linalg._umath_linalg) SIGILLs on
+                          # Render's CPU inside NeMo's embeddings-index build/search
+                          # (np.linalg.norm / matmul) — reproducible on every request,
+                          # confirmed via faulthandler, unaffected by OPENBLAS_CORETYPE
+                          # or NPY_DISABLE_CPU_FEATURES (numpy's own SIMD-dispatch
+                          # controls). 1.26.4 is numpy's pre-2.0 codebase — different
+                          # compiled dispatch entirely. See DEPLOYMENT_REPORT.md.
 
 # --- VECTOR DB & RETRIEVAL ---
 qdrant-client==1.19.0     # must match the client that wrote .qdrant_local's meta.json —
