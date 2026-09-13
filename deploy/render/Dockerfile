@@ -40,11 +40,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # memory-related. Forcing a conservative baseline target avoids the
     # mis-dispatch. See DEPLOYMENT_REPORT.md.
     OPENBLAS_CORETYPE=Haswell \
-    # Diagnostic: OPENBLAS_CORETYPE alone didn't stop the crash — same fault
-    # point, same exit code. faulthandler catches SIGILL too (on platforms
-    # that support it) and prints the actual Python-level stack frame that
-    # was executing, turning a blind native-code guess into a real traceback
-    # in the container logs. Temporary — remove once the real cause is found.
+    # faulthandler caught the actual fault (SIGILL, exit 132): every crash was
+    # inside numpy's OWN compiled dispatcher — nemoguardrails/embeddings/
+    # basic.py's build(), specifically np.linalg.norm() — not OpenBLAS (which
+    # is why OPENBLAS_CORETYPE alone did nothing: numpy.linalg._umath_linalg
+    # has its own independent runtime CPU-feature dispatch, separate from
+    # whatever BLAS is linked underneath). Render's virtualized CPU
+    # advertises AVX-512 support that its actual execution doesn't handle
+    # correctly, so numpy's dispatcher picks an AVX-512 code path and faults.
+    # This disables that family and falls back to a safe baseline.
+    NPY_DISABLE_CPU_FEATURES="AVX512F AVX512CD AVX512_SKX AVX512_CLX AVX512_CNL AVX512_ICL AVX512_KNL AVX512_KNM AVX512_SPR AVX512_GNR" \
+    # Kept enabled: confirms whether this is the actual fix from the traceback.
     PYTHONFAULTHANDLER=1
 
 WORKDIR /app
