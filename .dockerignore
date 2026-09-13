@@ -63,6 +63,16 @@ DEPLOYMENT.md
 INTERVIEW_GUIDE.md
 
 # Local demo artefacts
-.qdrant_local/
+#
+# .qdrant_local/ used to be excluded here unconditionally. The repo-root
+# Dockerfile (Gemini/Cloud-Run path) never used it — Qdrant Cloud instead —
+# so excluding it was harmless there. But deploy/gcp/Dockerfile and
+# deploy/render/Dockerfile both intentionally COPY a pre-populated
+# .qdrant_local/ into the image (the embedded-Qdrant baked-index pattern, see
+# DEPLOYMENT_REPORT.md), and both build with dockerContext "." — the repo
+# root — so this file's exclusions apply to them too. Excluding it here broke
+# that build with "COPY .qdrant_local/ ./.qdrant_local/: not found" even after
+# force-adding the directory to git. Not excluded any more; the only cost is
+# it enters the build context, which is 1.4 MB.
 scripts/
 DEMO.md
