@@ -6,9 +6,10 @@ from app.config import settings
 BATCH_SIZE = 50
 GEMINI_DIM = 3072
 LOCAL_DIM = 768  # all-mpnet-base-v2
+FASTEMBED_DIM = 384  # BAAI/bge-small-en-v1.5
 
 _active_model = None
-_model_type: str | None = None  # "gemini" or "local"
+_model_type: str | None = None  # "gemini" | "local" | "fastembed"
 
 
 # ── Model initialisation ───────────────────────────────────────────────────────
@@ -55,6 +56,27 @@ def _load_local():
     return SentenceTransformer(settings.LOCAL_EMBED_MODEL)
 
 
+def _load_fastembed():
+    """
+    Load the fastembed (onnxruntime) model.
+
+    Chosen for memory-capped hosts: onnxruntime is already in the image for
+    FlashRank, so this adds no PyTorch. Resident cost is ~150 MB against the
+    ~1 GB sentence-transformers pulls. 384-dim output — the collection must be
+    ingested with the same backend.
+    """
+    try:
+        from fastembed import TextEmbedding
+    except ImportError as exc:
+        raise RuntimeError(
+            "USE_FASTEMBED is set but the 'fastembed' package is not installed.\n"
+            "  pip install fastembed"
+        ) from exc
+
+    logfire.info(f"Loading fastembed ({settings.FASTEMBED_MODEL}, {FASTEMBED_DIM}-dim).")
+    return TextEmbedding(model_name=settings.FASTEMBED_MODEL)
+
+
 def _init():
     """
     Pick and load the embedding model once per process, on first use.
@@ -69,6 +91,11 @@ def _init():
     """
     global _active_model, _model_type
     if _active_model is not None:
+        return
+
+    if settings.USE_FASTEMBED:
+        _active_model = _load_fastembed()
+        _model_type = "fastembed"
         return
 
     if settings.USE_LOCAL_EMBEDDINGS:
@@ -106,7 +133,7 @@ def get_embedding_dim() -> int:
     therefore requires re-ingesting with --wipe.
     """
     _init()
-    return GEMINI_DIM if _model_type == "gemini" else LOCAL_DIM
+    return {"gemini": GEMINI_DIM, "fastembed": FASTEMBED_DIM}.get(_model_type, LOCAL_DIM)
 
 
 def get_model_type() -> str:
@@ -117,6 +144,9 @@ def get_model_type() -> str:
 # ── Batch embedding with retry ─────────────────────────────────────────────────
 
 def _embed_batch(batch: list[str]) -> list[list[float]]:
+    if _model_type == "fastembed":
+        return [v.tolist() for v in _active_model.embed(batch)]
+
     if _model_type != "gemini":
         return _active_model.encode(batch, show_progress_bar=False).tolist()
 
@@ -146,6 +176,8 @@ def embed_query(query: str) -> list[float]:
     _init()
     if _model_type == "gemini":
         return _active_model.embed_query(query)
+    if _model_type == "fastembed":
+        return next(iter(_active_model.embed([query]))).tolist()
     return _active_model.encode([query])[0].tolist()
 
 

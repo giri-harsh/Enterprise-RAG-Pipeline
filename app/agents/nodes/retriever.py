@@ -1,3 +1,5 @@
+import os
+
 import logfire
 
 from app.agents.state import AgentState
@@ -15,8 +17,11 @@ from app.services.retrieval.ranking_service import rerank_documents
 # Retrieving 15 and keeping 5 is the usual shape of that tradeoff: enough
 # candidates that a relevant chunk ranked 11th by cosine still has a chance,
 # few enough that reranking stays in the tens of milliseconds.
-SEARCH_LIMIT = 15
-RERANK_TOP_N = 5
+# Defaults are the audited values. Lower them via env on a memory-capped host —
+# fewer candidates held in memory during the rerank forward pass. Document any
+# non-default value in DEPLOYMENT_REPORT.md.
+SEARCH_LIMIT = int(os.getenv("RETRIEVAL_SEARCH_LIMIT", "15"))
+RERANK_TOP_N = int(os.getenv("RETRIEVAL_RERANK_TOP_N", "5"))
 
 
 def retrieve_node(state: AgentState) -> dict:

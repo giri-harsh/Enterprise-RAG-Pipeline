@@ -1,0 +1,51 @@
+# Render Blueprint — Enterprise RAG Pipeline (FastAPI backend).
+#
+# ⚠️  STATUS: not deployed. Blocked on two credentials only a human can obtain
+# (see DEPLOYMENT_REPORT.md for the full writeup):
+#     1. GEMINI_API_KEY — free, no card, but getting one means signing into a
+#        Google account at aistudio.google.com/apikey. This sandbox's browser
+#        has no logged-in Google session (verified — landed on the sign-in
+#        form), and there is no credential-manager tool available to complete
+#        that login unattended. Root-cause fix for the memory problem: removes
+#        the local embedding model (torch or onnxruntime) from the process
+#        entirely, replacing it with an HTTP call.
+#     2. A Render deploy credential — either an API key, or a person clicking
+#        "New → Blueprint" in the Render dashboard. No render CLI/token exists
+#        on this machine.
+#
+# Once a GEMINI_API_KEY exists: `USE_LOCAL_EMBEDDINGS=false` in .env, re-ingest
+# with `python -m app.ingestion.processor DATA --wipe` (dimension changes
+# 384/768 → 3072), confirm with scripts/preflight.py, re-measure RSS the same
+# way as before (see DEPLOYMENT_REPORT.md), then build deploy/render/Dockerfile.
+# Projected to fit comfortably under 512 MB once the local model is gone — but
+# treat that as a projection, not verified, until it's actually measured.
+#
+# Single instance is deliberate: LangGraph MemorySaver keeps conversation state
+# in process RAM. Do not scale horizontally.
+
+services:
+  - type: web
+    name: enterprise-rag-api
+    runtime: docker
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    numInstances: 1        # MemorySaver is per-process; never > 1
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Non-secret runtime config is baked into the Dockerfile ENV; these are the
+      # values that must not live in the image.
+      - key: API_KEY
+        sync: false        # set in the Render dashboard — 256-bit hex, see .env
+      - key: GROQ_API_KEY
+        sync: false        # set in the Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false        # set in the Render dashboard — aistudio.google.com/apikey, no card
+      - key: GROQ_FALLBACK_API_KEY
+        sync: false        # optional; only used if USE_GATEWAY=true
+      - key: LOGFIRE_TOKEN
+        sync: false        # optional
+      - key: PYTHONUNBUFFERED
+        value: "1"

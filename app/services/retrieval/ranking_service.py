@@ -21,16 +21,26 @@ _ranker = None
 _CACHE_DIR = os.path.join(tempfile.gettempdir(), "flashrank")
 
 
+# Override with FLASHRANK_MODEL to trade rerank quality for memory on a small
+# host — e.g. "ms-marco-TinyBERT-L-2-v2" (~4 MB) instead of the default
+# "ms-marco-MiniLM-L-12-v2" (~34 MB on disk, more resident). The cosine-order
+# fallback path in rerank_documents() is unaffected by the choice.
+_MODEL_NAME = os.getenv("FLASHRANK_MODEL") or None
+
+
 def _get_ranker() -> Ranker:
     global _ranker
     if _ranker is None:
-        logfire.info("Loading FlashRank cross-encoder (ms-marco-MiniLM-L-12-v2, ONNX).")
+        logfire.info(
+            f"Loading FlashRank cross-encoder ({_MODEL_NAME or 'ms-marco-MiniLM-L-12-v2'}, ONNX)."
+        )
+        kwargs = {"model_name": _MODEL_NAME} if _MODEL_NAME else {}
         try:
             os.makedirs(_CACHE_DIR, exist_ok=True)
-            _ranker = Ranker(cache_dir=_CACHE_DIR)
+            _ranker = Ranker(cache_dir=_CACHE_DIR, **kwargs)
         except Exception as exc:
             logfire.warning(f"Could not use {_CACHE_DIR} ({exc}) — falling back to default cache.")
-            _ranker = Ranker()
+            _ranker = Ranker(**kwargs)
     return _ranker
 
 

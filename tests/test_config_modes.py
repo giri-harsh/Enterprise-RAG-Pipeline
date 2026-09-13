@@ -36,7 +36,15 @@ def _settings_with(**env):
         importlib.reload(app.config)
 
 
-_MODE_KEYS = dict(USE_LOCAL_QDRANT=None, USE_LOCAL_EMBEDDINGS=None, USE_GATEWAY=None)
+_MODE_KEYS = dict(
+    USE_LOCAL_QDRANT=None,
+    USE_LOCAL_EMBEDDINGS=None,
+    USE_GATEWAY=None,
+    # Explicit "false", not None: a developer's .env may set USE_FASTEMBED=true,
+    # and app.config's load_dotenv() would re-assert it after the pop. These
+    # tests are about the LOCAL_MODE fan-out, not the fastembed override.
+    USE_FASTEMBED="false",
+)
 
 
 def test_local_mode_flips_all_three_layers():

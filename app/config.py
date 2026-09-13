@@ -39,6 +39,15 @@ class Settings:
     USE_LOCAL_EMBEDDINGS = _flag("USE_LOCAL_EMBEDDINGS", str(LOCAL_MODE))
     USE_GATEWAY = _flag("USE_GATEWAY", str(not LOCAL_MODE))
 
+    # Third embedding backend, for memory-constrained hosts (Render free tier,
+    # 512 MB). fastembed runs the model on onnxruntime — the same runtime
+    # FlashRank already pulls — instead of sentence-transformers' PyTorch, which
+    # alone costs ~1 GB resident. Takes precedence over USE_LOCAL_EMBEDDINGS when
+    # set. Vector width is 384 (bge-small), so the collection must be re-ingested
+    # with --wipe when switching to it. See DEPLOYMENT_REPORT.md.
+    USE_FASTEMBED = _flag("USE_FASTEMBED", "false")
+    FASTEMBED_MODEL = os.getenv("FASTEMBED_MODEL", "BAAI/bge-small-en-v1.5")
+
     # ── Embeddings ────────────────────────────────────────────────────────────
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/gemini-embedding-2-preview")
@@ -84,7 +93,9 @@ class Settings:
         return {
             "vectors": "embedded (local disk)" if cls.USE_LOCAL_QDRANT else "Qdrant Cloud",
             "embeddings": (
-                f"local · {cls.LOCAL_EMBED_MODEL} · 768-dim"
+                f"fastembed · {cls.FASTEMBED_MODEL} · 384-dim"
+                if cls.USE_FASTEMBED
+                else f"local · {cls.LOCAL_EMBED_MODEL} · 768-dim"
                 if cls.USE_LOCAL_EMBEDDINGS
                 else f"Gemini · {cls.GEMINI_EMBED_MODEL} · 3072-dim"
             ),

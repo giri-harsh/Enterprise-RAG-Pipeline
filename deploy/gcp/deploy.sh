@@ -16,7 +16,7 @@ set -euo pipefail
 : "${GCP_PROJECT:?set GCP_PROJECT to your billing-enabled project id}"
 REGION="${REGION:-us-central1}"
 SERVICE="enterprise-rag-api"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 gcloud config set project "$GCP_PROJECT"
@@ -44,7 +44,7 @@ IMAGE="${REGION}-docker.pkg.dev/${GCP_PROJECT}/cloud-run-source-deploy/${SERVICE
 gcloud builds submit --timeout=1800s \
   --tag "$IMAGE" \
   --gcs-log-dir="gs://${GCP_PROJECT}_cloudbuild/logs" \
-  -f deploy/Dockerfile.cloudrun . \
+  -f deploy/gcp/Dockerfile . \
   || gcloud builds submit --timeout=1800s --tag "$IMAGE" .   # fallback: default Dockerfile
 
 # --- Deploy ------------------------------------------------------------------
