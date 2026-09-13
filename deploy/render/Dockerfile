@@ -30,7 +30,16 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    # numpy's OpenBLAS backend auto-detects CPU SIMD features (AVX-512 etc.) at
+    # runtime. On Render's shared/virtualized CPUs the reported feature set can
+    # advertise instructions the actual host doesn't execute cleanly, which
+    # crashes the process with SIGILL (exit 132) the first time a numpy op
+    # that dispatches to that codepath runs — observed here inside NeMo
+    # Guardrails' embedding-similarity search (a numpy op), not anywhere
+    # memory-related. Forcing a conservative baseline target avoids the
+    # mis-dispatch. See DEPLOYMENT_REPORT.md.
+    OPENBLAS_CORETYPE=Haswell
 
 WORKDIR /app
 
