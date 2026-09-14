@@ -17,15 +17,12 @@ fastapi==0.136.1
 uvicorn[standard]==0.46.0
 python-dotenv==1.2.2
 requests==2.33.1          # also required by logfire[requests] instrumentation
-numpy==1.26.4             # transitive hard requirement of qdrant-client and FlashRank.
-                          # Downgraded from 2.4.4 2026-09-13: that build's compiled
-                          # linalg dispatch (numpy.linalg._umath_linalg) SIGILLs on
-                          # Render's CPU inside NeMo's embeddings-index build/search
-                          # (np.linalg.norm / matmul) — reproducible on every request,
-                          # confirmed via faulthandler, unaffected by OPENBLAS_CORETYPE
-                          # or NPY_DISABLE_CPU_FEATURES (numpy's own SIMD-dispatch
-                          # controls). 1.26.4 is numpy's pre-2.0 codebase — different
-                          # compiled dispatch entirely. See DEPLOYMENT_REPORT.md.
+numpy==2.5.2               # transitive hard requirement of qdrant-client and FlashRank.
+                          # The real SIGILL culprit was Annoy (see the nemoguardrails
+                          # pin above), not numpy — numpy version-hopping (2.4.4 ->
+                          # 1.26.4) during that misdiagnosis changed nothing, which in
+                          # hindsight was the tell. Pinned to 2.5.2 to match the venv
+                          # every local test in this deployment actually ran against.
 
 # --- VECTOR DB & RETRIEVAL ---
 qdrant-client==1.19.0     # must match the client that wrote .qdrant_local's meta.json —
@@ -50,7 +47,18 @@ pydantic==2.13.4
 langchain-google-genai==4.4.0
 
 # --- GUARDRAILS ---
-nemoguardrails==0.21.0
+# Bumped from 0.21.0 2026-09-13: that version's BasicEmbeddingsIndex.build()
+# uses Annoy (`from annoy import AnnoyIndex; ... self._index.build(10)`) for
+# the canonical-form/flow search index. Annoy's native C++ extension SIGILLs
+# (exit 132) on Render's virtualized CPU — 100% reproducible, confirmed via
+# faulthandler, on every single guardrail check in a fresh container.
+# 0.23.0 replaced Annoy entirely with a pure-numpy cosine-similarity index
+# (see nemoguardrails/embeddings/basic.py's build()/search()) — no native ANN
+# library at all. This is also the version every local test in this
+# deployment used (the working venv's actual installed version throughout),
+# so bumping the pin aligns production with what was actually verified,
+# rather than the untested original pin. See DEPLOYMENT_REPORT.md.
+nemoguardrails==0.23.0
 # The two packages below are not imported by any file in app/. They are kept
 # because nemoguardrails resolves provider integrations at import time and has
 # historically failed without them. Remove only after confirming that
