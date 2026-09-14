@@ -17,12 +17,13 @@ fastapi==0.136.1
 uvicorn[standard]==0.46.0
 python-dotenv==1.2.2
 requests==2.33.1          # also required by logfire[requests] instrumentation
-numpy==2.5.2               # transitive hard requirement of qdrant-client and FlashRank.
+numpy==2.4.4              # transitive hard requirement of qdrant-client and FlashRank.
                           # The real SIGILL culprit was Annoy (see the nemoguardrails
                           # pin above), not numpy — numpy version-hopping (2.4.4 ->
                           # 1.26.4) during that misdiagnosis changed nothing, which in
-                          # hindsight was the tell. Pinned to 2.5.2 to match the venv
-                          # every local test in this deployment actually ran against.
+                          # hindsight was the tell. Back to the original pin; 2.5.2
+                          # (this session's local venv) needs Python >=3.12 and isn't
+                          # installable on this image's 3.11 base.
 
 # --- VECTOR DB & RETRIEVAL ---
 qdrant-client==1.19.0     # must match the client that wrote .qdrant_local's meta.json —
